@@ -1,305 +1,182 @@
 # EvDiff Reproduction
 
-This repository reproduces the evaluation of [EvDiff: High Quality Video with an Event Camera](https://arxiv.org/abs/2511.17492) using the authors' released pretrained model and a smaller subset of the DSEC driving dataset.
+Reduced reproduction of [EvDiff: Event-Based Video Reconstruction using One-Step Diffusion Models](https://arxiv.org/abs/2511.17492) using pretrained EvDiff weights and three DSEC driving sequences.
 
-The objective is to reconstruct synchronized frames from event-camera streams and reproduce a reduced version of the paper's DSEC evaluation table using the same reconstruction metrics.
+This reproduction evaluates:
 
-## Reproduction scope
+- EvDiff
+- E2VID
+- HyperE2VID
 
-- Dataset: DSEC training split
-- Evaluation subset:
-  - `zurich_city_00_a`
-  - `zurich_city_02_a`
-  - `zurich_city_04_b`
-- Primary method: EvDiff pretrained checkpoint
-- Planned baselines: E2VID and HyperE2VID
-- Planned metrics: MSE, SSIM, and LPIPS
+Metrics:
 
-This is a subset reproduction, so the final metrics are not expected to exactly match the full DSEC results reported in the paper.
+- MSE, lower is better
+- SSIM, higher is better
+- LPIPS, lower is better
+
+All full-reference metrics are calculated after converting the reconstructed and reference RGB frames to grayscale.
 
 ## Reproduction status
 
-- [x] Select DSEC evaluation sequences
-- [x] Create parallel DSEC downloader
-- [x] Download and validate raw DSEC data
-- [x] Convert DSEC to the EVREAL memory-mapped format
-- [x] Download Stable Diffusion 3 Medium
-- [x] Download the EvDiff checkpoint
+- [x] Download selected DSEC sequences
+- [x] Verify raw DSEC files
+- [x] Convert DSEC to EVREAL-compatible memmap format
+- [x] Inspect converted arrays
+- [x] Export RGB previews
+- [x] Download EvDiff and Stable Diffusion 3 checkpoints
 - [x] Run EvDiff inference
-- [ ] Inspect frame and timestamp alignment
-- [ ] Compute MSE, SSIM, and LPIPS
-- [ ] Run baseline models
-- [ ] Generate the reduced reproduction table
+- [x] Evaluate EvDiff with MSE, SSIM, and LPIPS
+- [ ] Install EVREAL
+- [ ] Run E2VID
+- [ ] Run HyperE2VID
+- [ ] Generate final comparison table
+
+## Project structure
+
+```text
+EVDiff-Reproduced/
+├── EvDiff/
+├── EVREAL/
+├── data/
+│   ├── DSEC/
+│   │   └── train/
+│   └── DSEC_mem/
+│       └── train/
+├── outputs/
+│   └── evdiff/
+├── results/
+│   └── evdiff/
+├── conversion_preview/
+├── utils/
+│   ├── verify_raw_dsec.py
+│   ├── convert_dsec.py
+│   ├── inspect_dsec_arrays.py
+│   ├── export_dsec_previews.py
+│   ├── run_dsec_preparation.sh
+│   └── evaluate_evdiff.py
+├── download_dsec.py
+└── README.md
+```
+
+## Dataset subset
+
+The following DSEC training sequences are used:
+
+| Sequence | Reference images | Reconstructed frames |
+|---|---:|---:|
+| `zurich_city_00_a` | 939 | 938 |
+| `zurich_city_02_a` | 235 | 234 |
+| `zurich_city_04_b` | 269 | 268 |
+| **Total** | **1,443** | **1,440** |
+
+There is one fewer reconstructed frame than reference images because each reconstruction uses the events between two consecutive reference frames.
 
 ## Installation
 
-### 1. Clone the repository
+### 1. Clone EvDiff
+
+From the workspace root:
 
 ```bash
-git clone <repository-url>
-cd EVDiff-Reproduced
+git clone https://github.com/LiWeitu/EvDiff.git
 ```
 
-### 2. Create the Python environment
-
-Create and activate a virtual environment:
+### 2. Create the EvDiff environment
 
 ```bash
-python3 -m venv myenv
-source myenv/bin/activate
-python -m pip install --upgrade pip
-```
+conda create -n evdiff python=3.10 -y
+conda activate evdiff
 
-For Windows PowerShell:
-
-```powershell
-python -m venv myenv
-.\myenv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-```
-
-### 3. Install EvDiff dependencies
-
-Install PyTorch first using the version appropriate for the system's CUDA installation:
-
-```bash
-pip install torch torchvision
-```
-
-Install the remaining EvDiff dependencies:
-
-```bash
+cd EvDiff
 pip install -r requirements.txt
+cd ..
 ```
 
-Verify that PyTorch can access CUDA:
+### 3. Download the pretrained models
+
+Accept the Stable Diffusion 3 Medium license on Hugging Face before downloading it.
 
 ```bash
+conda activate evdiff
+cd EvDiff
+
+huggingface-cli download \
+  stabilityai/stable-diffusion-3-medium-diffusers \
+  --local-dir ./checkpoints/sd3-medium
+
+huggingface-cli download \
+  litutu135/EvDiff \
+  --local-dir ./checkpoints/evdiff
+
+cd ..
+```
+
+Expected checkpoint directories:
+
+```text
+EvDiff/checkpoints/
+├── evdiff/
+└── sd3-medium/
+```
+
+### 4. Verify CUDA
+
+```bash
+conda activate evdiff
+
 python - <<'PY'
 import torch
 
-print("PyTorch:", torch.__version__)
 print("CUDA available:", torch.cuda.is_available())
-print("CUDA devices:", torch.cuda.device_count())
+print("GPU count:", torch.cuda.device_count())
 
 for index in range(torch.cuda.device_count()):
-    print(f"GPU {index}: {torch.cuda.get_device_name(index)}")
+    print(index, torch.cuda.get_device_name(index))
 PY
 ```
 
-### 4. Install the DSEC subset
+## Download DSEC
 
-The dataset downloader uses only the Python standard library. No additional downloader packages are required.
-
-Confirm that the downloader is in the repository root:
+Download the three selected sequences:
 
 ```bash
-ls -lh download_dsec.py
-python download_dsec.py --help
-```
+conda activate myenv
 
-Preview the downloads without downloading any files:
-
-```bash
-python download_dsec.py \
-  --output ./data/DSEC/train \
-  --workers 12 \
-  --extract-workers 8 \
-  --dry-run
-```
-
-Download and extract the selected DSEC sequences:
-
-```bash
 python download_dsec.py \
   --output ./data/DSEC/train \
   --workers 12 \
   --extract-workers 8
 ```
 
-The downloader retrieves only the files required by the EvDiff DSEC converter:
+For a system with 20 CPU cores, 12 download workers and 8 extraction workers provide a reasonable starting configuration.
 
-- Left event-camera stream
-- Rectified left RGB frames
-- Left-frame exposure timestamps
-- Camera calibration
+The downloader retrieves the event stream, rectified left RGB images, timestamps, rectification map, and calibration required by EvDiff.
 
-The downloader:
+## Prepare DSEC
 
-- Downloads files concurrently
-- Resumes partial downloads
-- Extracts ZIP archives concurrently
-- Validates the resulting directory structure
-- Skips completed files when rerun
-
-The selected subset is approximately 4.5 GB compressed. Additional storage is required for the extracted dataset and converted NumPy arrays.
-
-#### Download one sequence first
-
-For a smaller smoke test, download only `zurich_city_02_a`:
+Make the preparation script executable:
 
 ```bash
-python download_dsec.py \
-  --output ./data/DSEC/train \
-  --sequences zurich_city_02_a \
-  --workers 4 \
-  --extract-workers 3
+chmod +x utils/run_dsec_preparation.sh
 ```
 
-Run the full command afterward to download the remaining sequences. Previously completed files will be skipped.
-
-#### Run the download in a persistent session
-
-For remote systems, use `tmux` so the download continues if the SSH connection closes:
+Run the complete preparation pipeline from any directory:
 
 ```bash
-tmux new -s dsec-download
-source myenv/bin/activate
-
-python download_dsec.py \
-  --output ./data/DSEC/train \
-  --workers 12 \
-  --extract-workers 8 2>&1 | tee dsec_download.log
+conda activate myenv
+./utils/run_dsec_preparation.sh
 ```
 
-Detach from `tmux` with `Ctrl+B`, followed by `D`.
+The script performs:
 
-Reconnect with:
+1. Raw dataset validation
+2. Smoke-test conversion of `zurich_city_02_a`
+3. Converted array validation
+4. RGB preview export
+5. Conversion of the remaining sequences
+6. Final validation and preview export
 
-```bash
-tmux attach -t dsec-download
-```
-
-#### Resume an interrupted download
-
-Run the same command again:
-
-```bash
-python download_dsec.py \
-  --output ./data/DSEC/train \
-  --workers 12 \
-  --extract-workers 8
-```
-
-Partial downloads use a `.part` suffix and will be resumed when the server supports HTTP range requests.
-
-#### Validate the dataset
-
-Each sequence should have the following structure:
-
-```text
-data/DSEC/train/
-└── zurich_city_02_a/
-    ├── events/
-    │   └── left/
-    │       ├── events.h5
-    │       └── rectify_map.h5
-    ├── images/
-    │   └── left/
-    │       ├── exposure_timestamps.txt
-    │       └── rectified/
-    │           ├── 000000.png
-    │           └── ...
-    └── calibration/
-        └── cam_to_cam.yaml
-```
-
-Verify the required files:
-
-```bash
-for sequence in zurich_city_00_a zurich_city_02_a zurich_city_04_b; do
-  test -f "data/DSEC/train/$sequence/events/left/events.h5" \
-    || echo "Missing events for $sequence"
-
-  test -f "data/DSEC/train/$sequence/events/left/rectify_map.h5" \
-    || echo "Missing rectify map for $sequence"
-
-  test -f "data/DSEC/train/$sequence/images/left/exposure_timestamps.txt" \
-    || echo "Missing timestamps for $sequence"
-
-  test -f "data/DSEC/train/$sequence/calibration/cam_to_cam.yaml" \
-    || echo "Missing calibration for $sequence"
-
-  find "data/DSEC/train/$sequence/images/left/rectified" \
-    -maxdepth 1 \
-    -name '*.png' \
-    -print \
-    -quit | grep -q . || echo "Missing RGB frames for $sequence"
-done
-```
-
-No output means that all required files were found.
-
-Check dataset storage usage:
-
-```bash
-du -sh ./data/DSEC
-df -h .
-```
-
-#### Remove downloaded archives
-
-After successful extraction and validation, the retained ZIP archives can be removed:
-
-```bash
-python download_dsec.py \
-  --output ./data/DSEC/train \
-  --workers 12 \
-  --extract-workers 8 \
-  --delete-archives
-```
-### 5. Prepare DSEC for EvDiff
-
-The raw DSEC sequences must be verified, converted to memory-mapped NumPy arrays, and inspected before inference.
-
-The preparation pipeline uses four Python scripts:
-
-| Script | Purpose |
-|---|---|
-| `verify_raw_dsec.py` | Verifies events, RGB frames, timestamps, and calibration |
-| `convert_dsec.py` | Converts raw DSEC sequences to the EvDiff input format |
-| `inspect_dsec_arrays.py` | Validates array shapes, types, timestamps, and polarity |
-| `export_dsec_previews.py` | Exports converted RGB frames for visual inspection |
-
-The complete pipeline is orchestrated by:
-
-```text
-run_dsec_preparation.sh
-```
-
-Make the runner executable:
-
-```bash
-chmod +x run_dsec_preparation.sh
-```
-
-Run the complete preparation pipeline:
-
-```bash
-./run_dsec_preparation.sh
-```
-
-The script performs the following steps:
-
-1. Verifies all three raw DSEC sequences.
-2. Converts `zurich_city_02_a` as a smoke test.
-3. Validates the smoke-test arrays.
-4. Exports smoke-test RGB preview frames.
-5. Converts the remaining two sequences.
-6. Validates all converted arrays.
-7. Exports RGB previews from every sequence.
-
-The pipeline stops immediately if verification, conversion, or inspection fails.
-
-The complete terminal output is saved to:
-
-```text
-dsec_preparation.log
-```
-
-#### Generated dataset
-
-The converted dataset is written to:
+Converted data is written to:
 
 ```text
 data/DSEC_mem/train/
@@ -319,84 +196,270 @@ images_ts.npy
 image_event_indices.npy
 ```
 
-The arrays follow the format expected by EvDiff:
-
-| Array | Expected format |
-|---|---|
-| `events_ts.npy` | Event timestamps stored as `float64` |
-| `events_xy.npy` | Event coordinates with shape `[N, 2]` |
-| `events_p.npy` | Event polarity represented as `0` or `1` |
-| `images.npy` | RGB frames stored as `uint8` |
-| `images_ts.npy` | Frame timestamps |
-| `image_event_indices.npy` | Event index associated with each frame |
-
-#### RGB previews
-
-Preview frames are written to:
+The converted RGB frames have shape:
 
 ```text
-conversion_preview/
+N x 464 x 640 x 3
+```
+
+The blank alignment region visible near an image boundary is an expected consequence of aligning the DSEC event and RGB cameras.
+
+## Run EvDiff inference
+
+Activate the EvDiff environment:
+
+```bash
+conda activate evdiff
+cd EvDiff
+```
+
+Run all three sequences:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python test/infer_e2vid.py \
+  --checkpoint ./checkpoints/evdiff/checkpoint \
+  --sd3_path ./checkpoints/sd3-medium \
+  --embedding_dir ./dataset/default \
+  --input_dir ../data/DSEC_mem/train \
+  --output_dir ../outputs \
+  --model_name evdiff \
+  --sequences zurich_city_00_a,zurich_city_02_a,zurich_city_04_b
+```
+
+Expected output:
+
+```text
+outputs/evdiff/
 ├── zurich_city_00_a/
 ├── zurich_city_02_a/
 └── zurich_city_04_b/
 ```
 
-Inspect these frames before running inference. A blank band near the bottom of an aligned DSEC frame can be expected because the event and RGB cameras require spatial alignment.
-
-#### Rerun behavior
-
-Completed conversions are skipped automatically:
+Verify the frame counts:
 
 ```bash
-./run_dsec_preparation.sh
+for sequence in \
+  zurich_city_00_a \
+  zurich_city_02_a \
+  zurich_city_04_b
+do
+  count=$(find "../outputs/evdiff/$sequence" \
+    -maxdepth 1 \
+    -name '*.png' \
+    | wc -l)
+
+  echo "$sequence: $count frames"
+done
 ```
 
-Force every sequence to be converted again with:
+Expected:
+
+```text
+zurich_city_00_a: 938 frames
+zurich_city_02_a: 234 frames
+zurich_city_04_b: 268 frames
+```
+
+## Evaluate EvDiff
+
+Install the metric dependencies:
 
 ```bash
-./run_dsec_preparation.sh --force
+conda activate evdiff
+pip install pyiqa scikit-image
 ```
 
-Custom paths can be provided through environment variables:
+Run the evaluator from the workspace root:
 
 ```bash
-RAW_ROOT=/path/to/raw/DSEC \
-CONVERTED_ROOT=/path/to/DSEC_mem \
-PREVIEW_ROOT=/path/to/previews \
-./run_dsec_preparation.sh
+python utils/evaluate_evdiff.py \
+  --device cuda \
+  --lpips-batch-size 4
 ```
 
-### 6. Install pretrained model weights
+The first invocation downloads the AlexNet and LPIPS pretrained weights.
 
-To be added after dataset conversion is working.
+Evaluation outputs:
 
-Required model releases:
+```text
+results/evdiff/
+├── per_frame.csv
+├── summary.csv
+└── summary.json
+```
 
-- Stable Diffusion 3 Medium
-- EvDiff pretrained checkpoint
+### Evaluation protocol
 
-## Inference
+- Prediction `i` is compared with `images[i]`.
+- All available reconstructed frames are evaluated.
+- RGB predictions and reference images are converted to grayscale.
+- Pixel values are normalized to `[0, 1]`.
+- MSE uses `skimage.metrics.mean_squared_error`.
+- SSIM uses Gaussian weights, sigma `1.5`, population covariance, and data range `1.0`.
+- LPIPS uses the PyIQA AlexNet implementation.
+- The recurrent sequence state is reset between sequences.
+- `ALL_WEIGHTED` is used as the primary aggregate.
 
-To be added after the dataset and pretrained weights are installed.
+## EvDiff results
 
-## Evaluation
+| Sequence | Frames | MSE ↓ | SSIM ↑ | LPIPS ↓ |
+|---|---:|---:|---:|---:|
+| `zurich_city_00_a` | 938 | 0.036225 | 0.379505 | 0.431870 |
+| `zurich_city_02_a` | 234 | 0.034425 | 0.346985 | 0.435160 |
+| `zurich_city_04_b` | 268 | 0.036995 | 0.357781 | 0.321861 |
+| **ALL_WEIGHTED** | **1,440** | **0.036076** | **0.370178** | **0.411931** |
 
-To be added after EvDiff inference has been validated.
+For reference, the paper reports the following full-DSEC EvDiff result:
 
-EvDiff's RGB reconstructions will be converted to grayscale before computing MSE, SSIM, and LPIPS, following the comparison protocol described in the paper.
+| Evaluation | MSE ↓ | SSIM ↑ | LPIPS ↓ |
+|---|---:|---:|---:|
+| EvDiff paper, full DSEC split | 0.0476 | 0.3677 | 0.4226 |
+| This three-sequence subset | 0.0361 | 0.3702 | 0.4119 |
 
-The reduced reproduction table will use this format:
+These numbers are not expected to match exactly because this experiment evaluates three selected DSEC training sequences rather than the complete official evaluation split.
+
+## Install EVREAL baselines
+
+EVREAL provides a unified implementation of E2VID, FireNet, E2VID+, FireNet+, SPADE-E2VID, SSL-E2VID, ET-Net, and HyperE2VID.
+
+### 1. Clone EVREAL
+
+From the workspace root:
+
+```bash
+git clone https://github.com/ercanburak/EVREAL.git
+cd EVREAL
+
+git lfs install
+git lfs pull
+```
+
+### 2. Create a separate environment
+
+```bash
+conda create -n evreal python=3.10 -y
+conda activate evreal
+
+conda install pytorch torchvision pytorch-cuda=12.1 \
+  -c pytorch \
+  -c nvidia \
+  -y
+
+pip install -r requirements.txt
+```
+
+### 3. Verify pretrained models
+
+```bash
+ls -lh \
+  pretrained/E2VID/model.pth \
+  pretrained/HyperE2VID/model.pth
+```
+
+If either checkpoint is a small Git LFS pointer, run:
+
+```bash
+git lfs pull
+```
+
+### 4. Connect the converted DSEC dataset
+
+From inside the `EVREAL` directory:
+
+```bash
+mkdir -p data
+ln -s ../../data/DSEC_mem/train data/DSEC_subset
+```
+
+Verify the link:
+
+```bash
+ls data/DSEC_subset/zurich_city_02_a
+```
+
+### 5. Create an E2VID smoke-test configuration
+
+```bash
+python - <<'PY'
+import json
+from pathlib import Path
+
+config = {
+    "root_path": "data/DSEC_subset",
+    "sequences": {
+        "zurich_city_02_a": {}
+    }
+}
+
+path = Path("config/dataset/DSEC_smoke.json")
+path.write_text(json.dumps(config, indent=2) + "\n")
+print(f"Created {path}")
+PY
+```
+
+### 6. Run the E2VID smoke test
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python eval.py \
+  -m E2VID \
+  -c std \
+  -d DSEC_smoke \
+  -qm mse ssim lpips
+```
+
+Expected reconstruction directory:
+
+```text
+EVREAL/outputs/std/DSEC_smoke/zurich_city_02_a/E2VID/
+```
+
+Verify that 234 reconstructed frames were created:
+
+```bash
+find outputs/std/DSEC_smoke/zurich_city_02_a/E2VID \
+  -maxdepth 1 \
+  -name 'frame_*.png' \
+  | wc -l
+```
+
+Expected:
+
+```text
+234
+```
+
+Do not run the complete baseline evaluation until the smoke-test images have been visually inspected and the frame count has been confirmed.
+
+## Planned comparison
+
+The first comparison will contain:
 
 | Method | MSE ↓ | SSIM ↑ | LPIPS ↓ |
 |---|---:|---:|---:|
 | E2VID | TBD | TBD | TBD |
 | HyperE2VID | TBD | TBD | TBD |
-| EvDiff | TBD | TBD | TBD |
+| EvDiff | 0.036076 | 0.370178 | 0.411931 |
+
+Additional EVREAL methods can be added after E2VID and HyperE2VID have been validated.
+
+## Reproducibility notes
+
+- Use the same converted DSEC arrays for every reconstruction method.
+- Use five event voxel bins.
+- Use events between consecutive reference frames.
+- Preserve recurrent state within a sequence.
+- Reset recurrent state between sequences.
+- Evaluate the same 1,440 frame indices for every method.
+- Apply each baseline’s official input and output normalization.
+- Use one unified metric implementation for the final comparison.
+- Report the subset and sequence names with every result.
+- Do not describe the subset result as an exact reproduction of the full DSEC benchmark.
 
 ## References
 
+- [EvDiff repository](https://github.com/LiWeitu/EvDiff)
 - [EvDiff paper](https://arxiv.org/abs/2511.17492)
-- [Official EvDiff repository](https://github.com/LiWeitu/EvDiff)
 - [DSEC dataset](https://dsec.ifi.uzh.ch/)
-- [DSEC downloads](https://dsec.ifi.uzh.ch/dsec-datasets/download/)
-- [EVREAL benchmark](https://github.com/ercanburak/EVREAL)
+- [EVREAL repository](https://github.com/ercanburak/EVREAL)
+- [E2VID repository](https://github.com/uzh-rpg/rpg_e2vid)
+- [HyperE2VID repository](https://github.com/ercanburak/HyperE2VID)
