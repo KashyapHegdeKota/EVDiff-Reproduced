@@ -21,8 +21,8 @@ This is a subset reproduction, so the final metrics are not expected to exactly 
 
 - [x] Select DSEC evaluation sequences
 - [x] Create parallel DSEC downloader
-- [ ] Download and validate raw DSEC data
-- [ ] Convert DSEC to the EVREAL memory-mapped format
+- [x] Download and validate raw DSEC data
+- [x] Convert DSEC to the EVREAL memory-mapped format
 - [ ] Download Stable Diffusion 3 Medium
 - [ ] Download the EvDiff checkpoint
 - [ ] Run EvDiff inference
@@ -248,17 +248,122 @@ python download_dsec.py \
   --extract-workers 8 \
   --delete-archives
 ```
+### 5. Prepare DSEC for EvDiff
 
-### 5. Convert DSEC to the EvDiff input format
+The raw DSEC sequences must be verified, converted to memory-mapped NumPy arrays, and inspected before inference.
 
-To be added after the raw DSEC dataset has been validated.
+The preparation pipeline uses four Python scripts:
 
-Planned paths:
+| Script | Purpose |
+|---|---|
+| `verify_raw_dsec.py` | Verifies events, RGB frames, timestamps, and calibration |
+| `convert_dsec.py` | Converts raw DSEC sequences to the EvDiff input format |
+| `inspect_dsec_arrays.py` | Validates array shapes, types, timestamps, and polarity |
+| `export_dsec_previews.py` | Exports converted RGB frames for visual inspection |
+
+The complete pipeline is orchestrated by:
 
 ```text
-Raw input:         ./data/DSEC/train
-Converted output:  ./data/DSEC_mem/train
-Converter:         tools/dsec/convert_small_align_rgb.py
+run_dsec_preparation.sh
+```
+
+Make the runner executable:
+
+```bash
+chmod +x run_dsec_preparation.sh
+```
+
+Run the complete preparation pipeline:
+
+```bash
+./run_dsec_preparation.sh
+```
+
+The script performs the following steps:
+
+1. Verifies all three raw DSEC sequences.
+2. Converts `zurich_city_02_a` as a smoke test.
+3. Validates the smoke-test arrays.
+4. Exports smoke-test RGB preview frames.
+5. Converts the remaining two sequences.
+6. Validates all converted arrays.
+7. Exports RGB previews from every sequence.
+
+The pipeline stops immediately if verification, conversion, or inspection fails.
+
+The complete terminal output is saved to:
+
+```text
+dsec_preparation.log
+```
+
+#### Generated dataset
+
+The converted dataset is written to:
+
+```text
+data/DSEC_mem/train/
+├── zurich_city_00_a/
+├── zurich_city_02_a/
+└── zurich_city_04_b/
+```
+
+Each converted sequence contains:
+
+```text
+events_ts.npy
+events_xy.npy
+events_p.npy
+images.npy
+images_ts.npy
+image_event_indices.npy
+```
+
+The arrays follow the format expected by EvDiff:
+
+| Array | Expected format |
+|---|---|
+| `events_ts.npy` | Event timestamps stored as `float64` |
+| `events_xy.npy` | Event coordinates with shape `[N, 2]` |
+| `events_p.npy` | Event polarity represented as `0` or `1` |
+| `images.npy` | RGB frames stored as `uint8` |
+| `images_ts.npy` | Frame timestamps |
+| `image_event_indices.npy` | Event index associated with each frame |
+
+#### RGB previews
+
+Preview frames are written to:
+
+```text
+conversion_preview/
+├── zurich_city_00_a/
+├── zurich_city_02_a/
+└── zurich_city_04_b/
+```
+
+Inspect these frames before running inference. A blank band near the bottom of an aligned DSEC frame can be expected because the event and RGB cameras require spatial alignment.
+
+#### Rerun behavior
+
+Completed conversions are skipped automatically:
+
+```bash
+./run_dsec_preparation.sh
+```
+
+Force every sequence to be converted again with:
+
+```bash
+./run_dsec_preparation.sh --force
+```
+
+Custom paths can be provided through environment variables:
+
+```bash
+RAW_ROOT=/path/to/raw/DSEC \
+CONVERTED_ROOT=/path/to/DSEC_mem \
+PREVIEW_ROOT=/path/to/previews \
+./run_dsec_preparation.sh
 ```
 
 ### 6. Install pretrained model weights
