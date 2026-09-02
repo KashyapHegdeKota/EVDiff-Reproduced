@@ -23,9 +23,9 @@ This is a subset reproduction, so the final metrics are not expected to exactly 
 - [x] Create parallel DSEC downloader
 - [x] Download and validate raw DSEC data
 - [x] Convert DSEC to the EVREAL memory-mapped format
-- [ ] Download Stable Diffusion 3 Medium
-- [ ] Download the EvDiff checkpoint
-- [ ] Run EvDiff inference
+- [x] Download Stable Diffusion 3 Medium
+- [x] Download the EvDiff checkpoint
+- [x] Run EvDiff inference
 - [ ] Inspect frame and timestamp alignment
 - [ ] Compute MSE, SSIM, and LPIPS
 - [ ] Run baseline models
