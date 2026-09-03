@@ -26,10 +26,10 @@ All full-reference metrics are calculated after converting the reconstructed and
 - [x] Download EvDiff and Stable Diffusion 3 checkpoints
 - [x] Run EvDiff inference
 - [x] Evaluate EvDiff with MSE, SSIM, and LPIPS
-- [ ] Install EVREAL
-- [ ] Run E2VID
-- [ ] Run HyperE2VID
-- [ ] Generate final comparison table
+- [x] Install EVREAL
+- [x] Run E2VID
+- [x] Run HyperE2VID
+- [x] Generate final comparison table
 
 ## Project structure
 
@@ -430,17 +430,60 @@ Expected:
 
 Do not run the complete baseline evaluation until the smoke-test images have been visually inspected and the frame count has been confirmed.
 
-## Planned comparison
+## DSEC subset results
 
-The first comparison will contain:
+The released EvDiff model was evaluated against E2VID and HyperE2VID on three DSEC driving sequences:
 
-| Method | MSE ↓ | SSIM ↑ | LPIPS ↓ |
-|---|---:|---:|---:|
-| E2VID | TBD | TBD | TBD |
-| HyperE2VID | TBD | TBD | TBD |
-| EvDiff | 0.036076 | 0.370178 | 0.411931 |
+- `zurich_city_00_a`
+- `zurich_city_02_a`
+- `zurich_city_04_b`
 
-Additional EVREAL methods can be added after E2VID and HyperE2VID have been validated.
+A total of 1,440 reconstructed frames were evaluated. Every method used the same frames, ground-truth images, frame mapping, grayscale conversion, and metric implementations.
+
+### Evaluation protocol
+
+- Prediction frame `i` is compared with `images[i]`.
+- The final ground-truth image is unused because `N` images define `N - 1` event intervals.
+- RGB predictions and references are converted to grayscale.
+- MSE uses `skimage.metrics.mean_squared_error`.
+- SSIM uses Gaussian weighting with `sigma=1.5`, sample covariance disabled, and `data_range=1.0`.
+- LPIPS uses PyIQA with grayscale images repeated across three channels.
+- Results are frame-weighted across all three sequences.
+
+### Results
+
+| Method | Frames | MSE ↓ | SSIM ↑ | LPIPS ↓ |
+|---|---:|---:|---:|---:|
+| **EvDiff** | 1,440 | **0.036076** | **0.370178** | **0.411931** |
+| HyperE2VID | 1,440 | 0.047467 | 0.341466 | 0.488303 |
+| E2VID | 1,440 | 0.083338 | 0.352847 | 0.517974 |
+
+EvDiff obtained the best result for all three metrics. Relative to HyperE2VID, EvDiff reduced MSE by approximately 24.0% and LPIPS by 15.6%, while improving SSIM by 8.4%.
+
+These results constitute a reduced DSEC reproduction. They should not be interpreted as an exact reproduction of the paper's full DSEC test-set results.
+
+### Run the unified evaluation
+
+From the workspace root:
+
+```bash
+conda activate evdiff
+
+python utils/unified_evaluation.py \
+    --methods evdiff e2vid hypere2vid \
+    --device cuda \
+    --lpips-batch-size 4
+```
+
+The evaluator creates:
+```text 
+results/comparison/
+├── per_frame.csv
+├── summary.csv
+├── comparison.csv
+├── comparison.md
+└── summary.json
+```
 
 ## Reproducibility notes
 
