@@ -1,0 +1,185 @@
+{
+  "created_at_utc": "2026-09-03T23:47:00.507695+00:00",
+  "protocol": {
+    "dataset": "DSEC",
+    "sequences": [
+      "zurich_city_00_a",
+      "zurich_city_02_a",
+      "zurich_city_04_b"
+    ],
+    "frame_mapping": "prediction index i maps to images[i]",
+    "expected_predictions": "number of images minus one",
+    "color_mode": "RGB converted to grayscale",
+    "grayscale_lpips_channels": 3,
+    "mse": "skimage.metrics.mean_squared_error",
+    "ssim": {
+      "implementation": "skimage.metrics.structural_similarity",
+      "gaussian_weights": true,
+      "sigma": 1.5,
+      "use_sample_covariance": false,
+      "data_range": 1.0
+    },
+    "lpips": "pyiqa.create_metric('lpips')",
+    "skip_first": 0,
+    "lpips_batch_size": 4,
+    "device": "cuda"
+  },
+  "prediction_sources": {
+    "EvDiff": {
+      "zurich_city_00_a": "/scratch/kkota3/EVDiff-Reproduced/outputs/evdiff/zurich_city_00_a",
+      "zurich_city_02_a": "/scratch/kkota3/EVDiff-Reproduced/outputs/evdiff/zurich_city_02_a",
+      "zurich_city_04_b": "/scratch/kkota3/EVDiff-Reproduced/outputs/evdiff/zurich_city_04_b"
+    },
+    "E2VID": {
+      "zurich_city_00_a": "/scratch/kkota3/EVDiff-Reproduced/outputs/e2vid/zurich_city_00_a",
+      "zurich_city_02_a": "/scratch/kkota3/EVDiff-Reproduced/outputs/e2vid/zurich_city_02_a",
+      "zurich_city_04_b": "/scratch/kkota3/EVDiff-Reproduced/outputs/e2vid/zurich_city_04_b"
+    },
+    "HyperE2VID": {
+      "zurich_city_00_a": "/scratch/kkota3/EVDiff-Reproduced/outputs/hypere2vid/zurich_city_00_a",
+      "zurich_city_02_a": "/scratch/kkota3/EVDiff-Reproduced/outputs/hypere2vid/zurich_city_02_a",
+      "zurich_city_04_b": "/scratch/kkota3/EVDiff-Reproduced/outputs/hypere2vid/zurich_city_04_b"
+    }
+  },
+  "sequence_results": [
+    {
+      "method": "EvDiff",
+      "sequence": "zurich_city_00_a",
+      "aggregation": "sequence",
+      "frames": 938,
+      "mse": 0.036224844732493856,
+      "ssim": 0.37950542430262274,
+      "lpips": 0.43186977928254144
+    },
+    {
+      "method": "EvDiff",
+      "sequence": "zurich_city_02_a",
+      "aggregation": "sequence",
+      "frames": 234,
+      "mse": 0.034425425225834964,
+      "ssim": 0.3469853814365472,
+      "lpips": 0.43516022769304424
+    },
+    {
+      "method": "EvDiff",
+      "sequence": "zurich_city_04_b",
+      "aggregation": "sequence",
+      "frames": 268,
+      "mse": 0.03699519416729284,
+      "ssim": 0.357781417234603,
+      "lpips": 0.3218606117723593
+    },
+    {
+      "method": "E2VID",
+      "sequence": "zurich_city_00_a",
+      "aggregation": "sequence",
+      "frames": 938,
+      "mse": 0.0928813370454727,
+      "ssim": 0.36195693953278213,
+      "lpips": 0.5343457482643982
+    },
+    {
+      "method": "E2VID",
+      "sequence": "zurich_city_02_a",
+      "aggregation": "sequence",
+      "frames": 234,
+      "mse": 0.05109998335089938,
+      "ssim": 0.2856978807423928,
+      "lpips": 0.6012013325324426
+    },
+    {
+      "method": "E2VID",
+      "sequence": "zurich_city_04_b",
+      "aggregation": "sequence",
+      "frames": 268,
+      "mse": 0.07808634752814694,
+      "ssim": 0.379592037230575,
+      "lpips": 0.3880017081748194
+    },
+    {
+      "method": "HyperE2VID",
+      "sequence": "zurich_city_00_a",
+      "aggregation": "sequence",
+      "frames": 938,
+      "mse": 0.04583530072735039,
+      "ssim": 0.35481702962119893,
+      "lpips": 0.49642494835579065
+    },
+    {
+      "method": "HyperE2VID",
+      "sequence": "zurich_city_02_a",
+      "aggregation": "sequence",
+      "frames": 234,
+      "mse": 0.0519358844399041,
+      "ssim": 0.28690053549964617,
+      "lpips": 0.5619589283935025
+    },
+    {
+      "method": "HyperE2VID",
+      "sequence": "zurich_city_04_b",
+      "aggregation": "sequence",
+      "frames": 268,
+      "mse": 0.049276733068300646,
+      "ssim": 0.3423786454913403,
+      "lpips": 0.3955658067073395
+    }
+  ],
+  "aggregate_frame_weighted": [
+    {
+      "method": "EvDiff",
+      "sequence": "ALL_WEIGHTED",
+      "aggregation": "frame_weighted",
+      "frames": 1440,
+      "mse": 0.03607580965191604,
+      "ssim": 0.37017783824367073,
+      "lpips": 0.4119305487515198
+    },
+    {
+      "method": "E2VID",
+      "sequence": "ALL_WEIGHTED",
+      "aggregation": "frame_weighted",
+      "frames": 1440,
+      "mse": 0.0833383551321578,
+      "ssim": 0.3528469301064331,
+      "lpips": 0.5179735288023949
+    },
+    {
+      "method": "HyperE2VID",
+      "sequence": "ALL_WEIGHTED",
+      "aggregation": "frame_weighted",
+      "frames": 1440,
+      "mse": 0.04746713437742833,
+      "ssim": 0.3414656778356119,
+      "lpips": 0.48830321319401265
+    }
+  ],
+  "aggregate_sequence_mean": [
+    {
+      "method": "EvDiff",
+      "sequence": "ALL_SEQUENCE_MEAN",
+      "aggregation": "sequence_mean",
+      "frames": 1440,
+      "mse": 0.03588182137520722,
+      "ssim": 0.36142407432459095,
+      "lpips": 0.39629687291598165
+    },
+    {
+      "method": "E2VID",
+      "sequence": "ALL_SEQUENCE_MEAN",
+      "aggregation": "sequence_mean",
+      "frames": 1440,
+      "mse": 0.07402255597483967,
+      "ssim": 0.34241561916858326,
+      "lpips": 0.5078495963238866
+    },
+    {
+      "method": "HyperE2VID",
+      "sequence": "ALL_SEQUENCE_MEAN",
+      "aggregation": "sequence_mean",
+      "frames": 1440,
+      "mse": 0.049015972745185044,
+      "ssim": 0.3280320702040618,
+      "lpips": 0.48464989448554424
+    }
+  ]
+}
